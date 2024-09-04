@@ -47,7 +47,7 @@ enum ActionRequired {
     Rename { new_name: String },
 }
 
-fn check_user(token: &'static str, username: &str) -> anyhow::Result<ActionRequired> {
+fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<ActionRequired> {
     // Send request
     let rep = minreq::post("https://pixelwar.insa.lol/admin/check")
         .with_header("Cookie", format!("pxls-token={}", token))
@@ -115,13 +115,37 @@ fn check_user(token: &'static str, username: &str) -> anyhow::Result<ActionRequi
     Ok(ActionRequired::None)
 }
 
+fn change_name(token: &'static str, username: &str, new_name: &str) -> anyhow::Result<()> {
+    // Send request
+    let rep = minreq::post("https://pixelwar.insa.lol/admin/forceNameChange")
+        .with_header("Cookie", format!("pxls-token={}", token))
+        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .with_body(format!("user={}&newName={}", encode(username), encode(new_name)))
+        .send()
+        .context("Failed to rename user")?;
+    if rep.status_code != 200 {
+        bail!("Failed to rename user: {}", rep.status_code);
+    }
+
+    Ok(())
+}
+
 fn run(token: &'static str) -> anyhow::Result<()> {
     let users = list_users()?;
     println!("Users: {:?}", users);
 
     for user in users {
-        match check_user(token, &user) {
-            Ok(r) => println!("User {user} -> {r:?}"),
+        match check_user_login(token, &user) {
+            Ok(ActionRequired::Rename { new_name }) => {
+                match change_name(token, &user, &new_name) {
+                    Ok(_) => println!("User {user} renamed to {new_name}"),
+                    Err(e) => eprintln!("Error renaming user {user}: {}", e),
+                }
+            },
+            Ok(ActionRequired::Ban { reason }) => {
+                // TODO
+            },
+            Ok(ActionRequired::None) => {},
             Err(e) => eprintln!("Error checking user {}: {}", user, e),
         }
     }
