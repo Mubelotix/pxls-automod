@@ -130,20 +130,34 @@ fn change_name(token: &'static str, username: &str, new_name: &str) -> anyhow::R
     Ok(())
 }
 
+fn permaban(token: &'static str, username: &str, reason: &str) -> anyhow::Result<()> {
+    // Send request
+    let rep = minreq::post("https://pixelwar.insa.lol/admin/permaban")
+        .with_header("Cookie", format!("pxls-token={}", token))
+        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .with_body(format!("username={}&reason={}", encode(username), encode(reason)))
+        .send()
+        .context("Failed to permaban user")?;
+    if rep.status_code != 200 {
+        bail!("Failed to permaban user: {}", rep.status_code);
+    }
+
+    Ok(())
+}
+
 fn run(token: &'static str) -> anyhow::Result<()> {
     let users = list_users()?;
     println!("Users: {:?}", users);
 
     for user in users {
         match check_user_login(token, &user) {
-            Ok(ActionRequired::Rename { new_name }) => {
-                match change_name(token, &user, &new_name) {
-                    Ok(_) => println!("User {user} renamed to {new_name}"),
-                    Err(e) => eprintln!("Error renaming user {user}: {}", e),
-                }
+            Ok(ActionRequired::Rename { new_name }) => match change_name(token, &user, &new_name) {
+                Ok(_) => println!("User {user} renamed to {new_name}"),
+                Err(e) => eprintln!("Error renaming user {user}: {}", e),
             },
-            Ok(ActionRequired::Ban { reason }) => {
-                // TODO
+            Ok(ActionRequired::Ban { reason }) => match permaban(token, &user, &reason) {
+                Ok(_) => println!("User {user} banned: {reason}"),
+                Err(e) => eprintln!("Error banning user {user}: {}", e),
             },
             Ok(ActionRequired::None) => {},
             Err(e) => eprintln!("Error checking user {}: {}", user, e),
