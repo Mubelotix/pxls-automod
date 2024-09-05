@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -50,7 +51,7 @@ enum ActionRequired {
 fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<ActionRequired> {
     // Send request
     let rep = minreq::post("https://pixelwar.insa.lol/admin/check")
-        .with_header("Cookie", format!("pxls-token={}", token))
+        .with_header("Cookie", format!("pxls-token={token}"))
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .with_body(format!("username={}", encode(username)))
         .send()
@@ -118,7 +119,7 @@ fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<Actio
 fn change_name(token: &'static str, username: &str, new_name: &str) -> anyhow::Result<()> {
     // Send request
     let rep = minreq::post("https://pixelwar.insa.lol/admin/forceNameChange")
-        .with_header("Cookie", format!("pxls-token={}", token))
+        .with_header("Cookie", format!("pxls-token={token}"))
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .with_body(format!("user={}&newName={}", encode(username), encode(new_name)))
         .send()
@@ -133,7 +134,7 @@ fn change_name(token: &'static str, username: &str, new_name: &str) -> anyhow::R
 fn permaban(token: &'static str, username: &str, reason: &str) -> anyhow::Result<()> {
     // Send request
     let rep = minreq::post("https://pixelwar.insa.lol/admin/permaban")
-        .with_header("Cookie", format!("pxls-token={}", token))
+        .with_header("Cookie", format!("pxls-token={token}"))
         .with_header("Content-Type", "application/x-www-form-urlencoded")
         .with_body(format!("username={}&reason={}", encode(username), encode(reason)))
         .send()
@@ -143,6 +144,79 @@ fn permaban(token: &'static str, username: &str, reason: &str) -> anyhow::Result
     }
 
     Ok(())
+}
+
+fn get_factions(token: &'static str) -> anyhow::Result<HashMap<String, usize>> {
+    // Send request
+    let rep = minreq::get("https://pixelwar.insa.lol/api/v1/profile?username=automod")
+        .with_header("Cookie", format!("pxls-token={token}"))
+        .send()
+        .context("Failed to load factions")?;
+    if rep.status_code != 200 {
+        bail!("Failed to load factions: {}", rep.status_code);
+    }
+
+    // Get factions
+    let data: Value = rep.json().context("Failed to parse factions")?;
+    let user = data.get("user").context("Failed to find user")?;
+    let factions = user.get("factions").context("Failed to find factions")?;
+    let factions = factions.as_array().context("Factions is not an array")?;
+    let factions: HashMap<String, usize> = factions
+        .iter()
+        .map(|faction| {
+            let name = faction.get("name").and_then(|n| n.as_str()).context("Failed to find faction name")?;
+            let id = faction.get("color").and_then(|c| c.as_u64()).context("Failed to find faction color")?;
+            Ok((name.to_string(), id as usize))
+        })
+        .collect::<anyhow::Result<_>>()?;
+
+    Ok(factions)
+}
+
+fn create_faction(token: &'static str, faction: &str, color: usize) -> anyhow::Result<()> {
+    // Send request
+    let rep = minreq::post("https://pixelwar.insa.lol/factions")
+        .with_header("Cookie", format!("pxls-token={token}"))
+        .with_header("Content-Type", "application/json")
+        .with_body(format!("{{\"name\":{faction:?},\"tag\":{faction:?},\"color\":{color}}}"))
+        .send()
+        .context("Failed to create faction")?;
+    if rep.status_code != 200 {
+        bail!("Failed to create faction: {} {}", rep.status_code, rep.as_str().unwrap_or_default());
+    }
+
+    Ok(())
+}
+
+fn prepare(token: &'static str) -> anyhow::Result<HashMap<String, usize>> {
+    const EXPECTED_FACTIONS: &[(&str, usize)] = &[
+        ("MECA", 0xffea00),
+        ("MRIE", 0x59ff21),
+        ("CFI", 0xff2200),
+        ("EP", 0xff8ac0),
+        ("GM", 0x0600bd),
+        ("ITI", 0x00fffb),
+        ("GC", 0xff7700)
+    ];
+
+    let mut existing_factions = get_factions(token)?;
+    println!("Factions: {existing_factions:?}");
+
+    let mut changed = false;
+    for (faction, color) in EXPECTED_FACTIONS {
+        if !existing_factions.contains_key(*faction) {
+            println!("Creating faction {faction}");
+            create_faction(token, faction, *color)?;
+            changed = true;
+        }
+    }
+
+    if changed {
+        existing_factions = get_factions(token)?;
+        println!("Factions: {existing_factions:?}");
+    }
+
+    Ok(existing_factions)
 }
 
 fn run(token: &'static str) -> anyhow::Result<()> {
@@ -171,8 +245,10 @@ fn main() {
     let token = std::env::var("PXLS_TOKEN").expect("missing PXLS_TOKEN variable");
     let token = token.leak();
 
-    println!("Running");
+    println!("Preparing");
+    prepare(token).expect("Failed to prepare");
 
+    println!("Running");
     loop {
         if let Err(e) = run(token) {
             eprintln!("Error: {}", e)
