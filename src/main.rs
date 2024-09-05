@@ -233,7 +233,7 @@ fn permaban(token: &'static str, username: &str, reason: &str) -> anyhow::Result
     let rep = minreq::post("https://pixelwar.insa.lol/admin/permaban")
         .with_header("Cookie", format!("pxls-token={token}"))
         .with_header("Content-Type", "application/x-www-form-urlencoded")
-        .with_body(format!("username={}&reason={}", encode(username), encode(reason)))
+        .with_body(format!("username={}&reason={}&rollback_time=1000000", encode(username), encode(reason)))
         .send()
         .context("Failed to permaban user")?;
     if rep.status_code != 200 {
