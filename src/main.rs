@@ -137,7 +137,7 @@ fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<Actio
     let logins = logins.as_array().context("Logins is not an array")?;
     if logins.len() != 1 {
         return Ok(ActionRequired::Ban {
-            reason: String::from("Vous ne devez avoir qu'exactement un seul login. Contactez un admin."),
+            reason: String::from("Vous ne devez avoir qu'exactement un seul login. Contactez moi (cf les infos)."),
         });
     }
     let login = logins[0].as_object().context("Login is not an object")?;
@@ -145,7 +145,7 @@ fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<Actio
     let service_id = service_id.as_str().context("ServiceID is not a string")?;
     if service_id != "cas" {
         return Ok(ActionRequired::Ban {
-            reason: String::from("Vous ne devez vous connecter qu'avec le CAS. Contactez un admin."),
+            reason: String::from("Vous ne devez vous connecter qu'avec le CAS. Contactez moi (cf les infos)."),
         });
     }
 
@@ -166,7 +166,7 @@ fn check_user_factions(old_username: &String, username: &str, factions: &HashMap
     let user_factions = factions.values().filter(|(_,members)| members.contains(old_username)).map(|(fid, _)| *fid).collect::<Vec<_>>();
     if user_factions.len() > 1 {
         return Ok(ActionRequired::Ban {
-            reason: String::from("Vous ne devez avoir qu'une seule faction. Contactez un admin."),
+            reason: String::from("Vous ne devez avoir qu'une seule faction. Contactez moi (cf les infos)."),
         });
     }
     let user_fid = user_factions.first().copied();
@@ -175,7 +175,7 @@ fn check_user_factions(old_username: &String, username: &str, factions: &HashMap
     let expected_faction = match USERS.get(username).copied() {
         Some(faction) => faction,
         None => return Ok(ActionRequired::Ban {
-            reason: String::from("Vous n'êtes pas inscrits en 3ème année. Si vous êtes dans une situation particulière, contactez un admin."),
+            reason: String::from("Vous n'etes pas inscrits en 3eme année. Si c'est une erreur et que vous etes dans une situation particuliere, contactez moi (cf les infos)."),
         }),
     };
     let expected_fid = factions.get(expected_faction).map(|(fid,_)| *fid).ok_or_else(|| anyhow!("Faction inconnue: {expected_faction}"))?;
@@ -194,7 +194,7 @@ fn check_user_factions(old_username: &String, username: &str, factions: &HashMap
 
     // When user is in the wrong faction
     Ok(ActionRequired::Ban {
-        reason: String::from("Vous n'etes pas dans la bonne faction. Contactez un admin."),
+        reason: String::from("Vous n'etes pas dans la bonne faction. Contactez moi (cf les infos)."),
     })
 }
 
