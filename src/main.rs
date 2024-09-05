@@ -1,11 +1,28 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::thread::sleep;
 use std::time::Duration;
 
-use anyhow::bail;
+use anyhow::{bail, anyhow};
 use anyhow::Context;
 use serde_json::Value;
 use urlencoding::encode;
+
+const EXPECTED_FACTIONS: &[(&str, usize)] = &[
+    ("MECA", 0xffea00),
+    ("MRIE", 0x59ff21),
+    ("CFI", 0xff2200),
+    ("EP", 0xff8ac0),
+    ("GM", 0x0600bd),
+    ("ITI", 0x00fffb),
+    ("GC", 0xff7700)
+];
+
+static USERS: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| {
+    HashMap::from_iter([
+        ("simon_girard", "ITI"),
+    ])
+});
 
 fn list_users() -> anyhow::Result<Vec<String>> {
     // Send request
@@ -43,9 +60,36 @@ fn list_users() -> anyhow::Result<Vec<String>> {
 
 #[derive(Debug)]
 enum ActionRequired {
+    Skip,
     None,
     Ban { reason: String },
     Rename { new_name: String },
+    JoinFaction { fid: usize },
+}
+
+impl ActionRequired {
+    fn exec(self, token: &'static str, username: String) -> String {
+        match self {
+            ActionRequired::Skip => {},
+            ActionRequired::None => {},
+            ActionRequired::Ban { reason } => match permaban(token, &username, &reason) {
+                Ok(_) => println!("User {username} banned: {reason}"),
+                Err(e) => eprintln!("Error banning user {username}: {}", e),
+            },
+            ActionRequired::Rename { new_name } => match change_name(token, &username, &new_name) {
+                Ok(_) => {
+                    println!("User {username} renamed to {new_name}");
+                    return new_name.to_owned();
+                },
+                Err(e) => eprintln!("Error renaming user {username}: {}", e),
+            },
+            ActionRequired::JoinFaction { fid } => match change_faction(token, &username, fid) {
+                Ok(_) => println!("User {username} joined faction {fid}"),
+                Err(e) => eprintln!("Error joining faction {fid}: {}", e),
+            },
+        }
+        username
+    }
 }
 
 fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<ActionRequired> {
@@ -77,14 +121,14 @@ fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<Actio
         .collect::<anyhow::Result<Vec<String>>>()?;
     let is_more_than_user = roles.iter().any(|role| role != "guest" && role != "user");
     if is_more_than_user {
-        return Ok(ActionRequired::None);
+        return Ok(ActionRequired::Skip);
     }
 
     // Skip if user is banned
     let banned = res.get("banned").context("Failed to find banned")?;
     let banned = banned.as_bool().context("Banned is not a boolean")?;
     if banned {
-        return Ok(ActionRequired::None);
+        return Ok(ActionRequired::Skip);
     }
 
     // Get logins
@@ -116,6 +160,32 @@ fn check_user_login(token: &'static str, username: &str) -> anyhow::Result<Actio
     Ok(ActionRequired::None)
 }
 
+fn check_user_factions(token: &'static str, username: &str, factions: &HashMap<String, usize>) -> anyhow::Result<ActionRequired> {
+    let user_factions = get_factions(token, username)?;
+    if user_factions.len() > 1 {
+        return Ok(ActionRequired::Ban {
+            reason: String::from("Vous ne devez avoir qu'une seule faction. Contactez un admin."),
+        });
+    }
+    let user_fid = user_factions.iter().next().map(|(_, id)| *id);
+
+    let expected_faction = match USERS.get(username).copied() {
+        Some(faction) => faction,
+        None => return Ok(ActionRequired::Ban {
+            reason: String::from("Vous n'êtes pas inscrits en 3ème année. Si vous êtes dans une situation particulière, contactez un admin."),
+        }),
+    };
+    let expected_fid = factions.get(expected_faction).copied().ok_or_else(|| anyhow!("Faction inconnue: {expected_faction}"))?;
+
+    if user_fid != Some(expected_fid) {
+        return Ok(ActionRequired::JoinFaction {
+            fid: expected_fid,
+        });
+    }
+
+    Ok(ActionRequired::None)
+}
+
 fn change_name(token: &'static str, username: &str, new_name: &str) -> anyhow::Result<()> {
     // Send request
     let rep = minreq::post("https://pixelwar.insa.lol/admin/forceNameChange")
@@ -126,6 +196,21 @@ fn change_name(token: &'static str, username: &str, new_name: &str) -> anyhow::R
         .context("Failed to rename user")?;
     if rep.status_code != 200 {
         bail!("Failed to rename user: {}", rep.status_code);
+    }
+
+    Ok(())
+}
+
+fn change_faction(token: &'static str, username: &str, fid: usize) -> anyhow::Result<()> {
+    // Send request
+    let rep = minreq::post("https://pixelwar.insa.lol/admin/faction/join")
+        .with_header("Cookie", format!("pxls-token={token}"))
+        .with_header("Content-Type", "application/x-www-form-urlencoded")
+        .with_body(format!("user={}&fid={}", encode(username), fid))
+        .send()
+        .context("Failed to change faction")?;
+    if rep.status_code != 200 {
+        bail!("Failed to change faction: {}", rep.status_code);
     }
 
     Ok(())
@@ -146,9 +231,9 @@ fn permaban(token: &'static str, username: &str, reason: &str) -> anyhow::Result
     Ok(())
 }
 
-fn get_factions(token: &'static str) -> anyhow::Result<HashMap<String, usize>> {
+fn get_factions(token: &'static str, username: &str) -> anyhow::Result<HashMap<String, usize>> {
     // Send request
-    let rep = minreq::get("https://pixelwar.insa.lol/api/v1/profile?username=automod")
+    let rep = minreq::get(format!("https://pixelwar.insa.lol/api/v1/profile?username={}", encode(username)))
         .with_header("Cookie", format!("pxls-token={token}"))
         .send()
         .context("Failed to load factions")?;
@@ -165,7 +250,7 @@ fn get_factions(token: &'static str) -> anyhow::Result<HashMap<String, usize>> {
         .iter()
         .map(|faction| {
             let name = faction.get("name").and_then(|n| n.as_str()).context("Failed to find faction name")?;
-            let id = faction.get("color").and_then(|c| c.as_u64()).context("Failed to find faction color")?;
+            let id = faction.get("id").and_then(|c| c.as_u64()).context("Failed to find faction id")?;
             Ok((name.to_string(), id as usize))
         })
         .collect::<anyhow::Result<_>>()?;
@@ -189,17 +274,7 @@ fn create_faction(token: &'static str, faction: &str, color: usize) -> anyhow::R
 }
 
 fn prepare(token: &'static str) -> anyhow::Result<HashMap<String, usize>> {
-    const EXPECTED_FACTIONS: &[(&str, usize)] = &[
-        ("MECA", 0xffea00),
-        ("MRIE", 0x59ff21),
-        ("CFI", 0xff2200),
-        ("EP", 0xff8ac0),
-        ("GM", 0x0600bd),
-        ("ITI", 0x00fffb),
-        ("GC", 0xff7700)
-    ];
-
-    let mut existing_factions = get_factions(token)?;
+    let mut existing_factions = get_factions(token, "automod")?;
     println!("Factions: {existing_factions:?}");
 
     let mut changed = false;
@@ -212,30 +287,38 @@ fn prepare(token: &'static str) -> anyhow::Result<HashMap<String, usize>> {
     }
 
     if changed {
-        existing_factions = get_factions(token)?;
+        existing_factions = get_factions(token, "automod")?;
         println!("Factions: {existing_factions:?}");
     }
 
     Ok(existing_factions)
 }
 
-fn run(token: &'static str) -> anyhow::Result<()> {
+fn run(token: &'static str, factions: &HashMap<String, usize>) -> anyhow::Result<()> {
     let users = list_users()?;
     println!("Users: {:?}", users);
 
-    for user in users {
-        match check_user_login(token, &user) {
-            Ok(ActionRequired::Rename { new_name }) => match change_name(token, &user, &new_name) {
-                Ok(_) => println!("User {user} renamed to {new_name}"),
-                Err(e) => eprintln!("Error renaming user {user}: {}", e),
+    for mut username in users {
+        // Check user logins
+        let action_required = match check_user_login(token, &username) {
+            Ok(ActionRequired::Skip) => continue,
+            Ok(action) => action,
+            Err(e) => {
+                eprintln!("Error checking user {}: {}", username, e);
+                continue;
             },
-            Ok(ActionRequired::Ban { reason }) => match permaban(token, &user, &reason) {
-                Ok(_) => println!("User {user} banned: {reason}"),
-                Err(e) => eprintln!("Error banning user {user}: {}", e),
+        };
+        username = action_required.exec(token, username);
+
+        // Check user factions
+        let action_required = match check_user_factions(token, &username, factions) {
+            Ok(action) => action,
+            Err(e) => {
+                eprintln!("Error checking user factions {}: {}", username, e);
+                continue;
             },
-            Ok(ActionRequired::None) => {},
-            Err(e) => eprintln!("Error checking user {}: {}", user, e),
-        }
+        };
+        action_required.exec(token, username);
     }
 
     Ok(())
@@ -246,11 +329,11 @@ fn main() {
     let token = token.leak();
 
     println!("Preparing");
-    prepare(token).expect("Failed to prepare");
+    let factions = prepare(token).expect("Failed to prepare");
 
     println!("Running");
     loop {
-        if let Err(e) = run(token) {
+        if let Err(e) = run(token, &factions) {
             eprintln!("Error: {}", e)
         }
 
