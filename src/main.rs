@@ -1,12 +1,13 @@
-use std::collections::HashMap;
-use std::sync::LazyLock;
 use std::thread::sleep;
 use std::time::Duration;
-
+use std::collections::HashMap;
 use anyhow::{bail, anyhow};
 use anyhow::Context;
 use serde_json::Value;
 use urlencoding::encode;
+
+mod users;
+use users::USERS;
 
 const EXPECTED_FACTIONS: &[(&str, usize)] = &[
     ("MECA", 0xffea00),
@@ -17,13 +18,6 @@ const EXPECTED_FACTIONS: &[(&str, usize)] = &[
     ("ITI", 0x00fffb),
     ("GC", 0xff7700)
 ];
-
-static USERS: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| {
-    HashMap::from_iter([
-        ("simon_girard", "ITI"),
-        ("iris_dussuyer", "ITI"),
-    ])
-});
 
 fn list_users() -> anyhow::Result<Vec<String>> {
     // Send request
