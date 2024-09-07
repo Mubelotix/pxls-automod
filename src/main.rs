@@ -16,7 +16,7 @@ const EXPECTED_FACTIONS: &[(&str, usize)] = &[
     ("EP", 0xff8ac0),
     ("GM", 0x0600bd),
     ("ITI", 0x00fffb),
-    ("GC", 0xff7700)
+    ("LH", 0xff7700)
 ];
 
 fn list_users() -> anyhow::Result<Vec<String>> {
