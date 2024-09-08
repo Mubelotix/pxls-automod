@@ -331,7 +331,7 @@ fn run(token: &'static str) -> anyhow::Result<()> {
                 continue;
             },
         };
-        action_required.exec(token, &username);
+        action_required.exec(token, &new_username);
     }
 
     Ok(())
