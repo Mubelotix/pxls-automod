@@ -14,6 +14,7 @@ fn main() {
     let data = std::fs::read_to_string("../Pxls/extras/pixels.log").expect("Failed to read pixels.log");
 
     let mut board = vec![vec![""; 250]; 250];
+    let mut recovered_counts = vec![vec![0; 250]; 250];
     for line in data.lines() {
         let mut parts = line.split("\t");
         let Some(time) = parts.next() else {continue};
@@ -31,7 +32,9 @@ fn main() {
             eprintln!("Unknown user: {}", username);
             continue;
         };
+
         board[x as usize][y as usize] = faction;
+        recovered_counts[x as usize][y as usize] += 1;
     }
 
     let mut stats = HashMap::new();
@@ -63,4 +66,19 @@ fn main() {
             _ => continue,
         }
     }
+
+    println!("\nMost recovered pixel:");
+    let mut max = 0;
+    let mut max_x = 0;
+    let mut max_y = 0;
+    for (x, row) in recovered_counts.iter().enumerate() {
+        for (y, count) in row.iter().enumerate() {
+            if *count > max {
+                max = *count;
+                max_x = x;
+                max_y = y;
+            }
+        }
+    }
+    println!("({}, {}): {}", max_x, max_y, max);
 }
