@@ -413,5 +413,8 @@ pub static USERS: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| {
         ("youssra_chellali", "MRIE"),
         ("yuzhen_ni", "ITI"),
         ("zakaria_barhoumi", "ITI"),
+
+        // Manually added
+        ("oscar_mazuel", "LH"),
     ])
 });
