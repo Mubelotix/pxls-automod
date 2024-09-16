@@ -41,10 +41,26 @@ fn main() {
             *count += 1;
         }
     }
+
+    println!("\nPixel counts:");
     for (faction, count) in stats.iter() {
         if faction.is_empty() {
             continue;
         }
         println!("{}: {}", faction, count);
+    }
+
+    println!("\nScores:");
+    for (faction, count) in stats.iter() {
+        match *(*faction) {
+            "LH" => println!("{}: {}", faction, (*count as f64 * 1.8).floor()),
+            "MRIE" => println!("{}: {}", faction, (*count as f64 * 1.73).floor()),
+            "GM" => println!("{}: {}", faction, (*count as f64 * 1.23).floor()),
+            "ITI" => println!("{}: {}", faction, (*count as f64 * 1.21).floor()),
+            "CFI" => println!("{}: {}", faction, (*count as f64 * 1.21).floor()),
+            "MECA" => println!("{}: {}", faction, (*count as f64 * 1.03).floor()),
+            "EP" => println!("{}: {}", faction, (*count as f64 * 1.0).floor()),
+            _ => continue,
+        }
     }
 }
