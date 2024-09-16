@@ -81,4 +81,15 @@ fn main() {
         }
     }
     println!("({}, {}): {}", max_x, max_y, max);
+
+    println!("\nShare of map completed:");
+    let mut count = 0;
+    for row in board.iter() {
+        for faction in row.iter() {
+            if !faction.is_empty() {
+                count += 1;
+            }
+        }
+    }
+    println!("{:.02}%", (count as f64 / 62500.0 * 100.0));
 }
