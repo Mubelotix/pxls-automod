@@ -110,4 +110,8 @@ fn main() {
         }
         println!("{}: {} ({})", faction, best_user, best);
     }
+
+    println!("\nNumber of pixels placed:");
+    let total = user_counts.values().sum::<i32>();
+    println!("{}", total);
 }
