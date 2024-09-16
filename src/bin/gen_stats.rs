@@ -133,4 +133,9 @@ fn main() {
         let faction = USERS.get(*user).unwrap();
         println!("{}: {} ({})", user, count, faction);
     }
+
+    println!("\nTime spent on the board:");
+    let min = total * 30;
+    let max = total * 50;
+    println!("Estimated between {} and {} hours", min/3600, max/3600);
 }
