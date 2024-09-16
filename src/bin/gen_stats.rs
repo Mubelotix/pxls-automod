@@ -1,6 +1,6 @@
 use std::thread::sleep;
 use std::time::Duration;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use anyhow::{bail, anyhow};
 use anyhow::Context;
 use serde_json::Value;
@@ -15,6 +15,7 @@ fn main() {
 
     let mut board = vec![vec![""; 250]; 250];
     let mut recovered_counts = vec![vec![0; 250]; 250];
+    let mut user_counts = HashMap::new();
     for line in data.lines() {
         let mut parts = line.split("\t");
         let Some(time) = parts.next() else {continue};
@@ -35,6 +36,7 @@ fn main() {
 
         board[x as usize][y as usize] = faction;
         recovered_counts[x as usize][y as usize] += 1;
+        *user_counts.entry(username).or_insert(0) += 1;
     }
 
     let mut stats = HashMap::new();
@@ -92,4 +94,20 @@ fn main() {
         }
     }
     println!("{:.02}%", (count as f64 / 62500.0 * 100.0));
+
+    println!("\nUser count:");
+    println!("{:?}", user_counts.len());
+
+    println!("\nBest of each faction:");
+    for faction in ["MECA", "MRIE", "CFI", "EP", "GM", "ITI", "LH"] {
+        let mut best = 0;
+        let mut best_user = "";
+        for (user, user_count) in user_counts.iter() {
+            if *USERS.get(user).unwrap() == faction && *user_count > best {
+                best = *user_count;
+                best_user = user;
+            }
+        }
+        println!("{}: {} ({})", faction, best_user, best);
+    }
 }
