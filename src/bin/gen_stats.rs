@@ -14,8 +14,8 @@ fn main() {
     let data = std::fs::read_to_string("../Pxls/extras/pixels.log").expect("Failed to read pixels.log");
 
     let mut board = vec![vec![""; 250]; 250];
+    let mut board_usernames = vec![vec![""; 250]; 250];
     let mut recovered_counts = vec![vec![0; 250]; 250];
-    let mut user_counts = HashMap::new();
     for line in data.lines() {
         let mut parts = line.split("\t");
         let Some(time) = parts.next() else {continue};
@@ -35,14 +35,25 @@ fn main() {
         };
 
         board[x as usize][y as usize] = faction;
+        board_usernames[x as usize][y as usize] = username;
         recovered_counts[x as usize][y as usize] += 1;
-        *user_counts.entry(username).or_insert(0) += 1;
     }
 
     let mut stats = HashMap::new();
     for row in board.iter() {
         for faction in row.iter() {
             let count = stats.entry(faction).or_insert(0);
+            *count += 1;
+        }
+    }
+
+    let mut user_counts = HashMap::new();
+    for row in board_usernames.iter() {
+        for username in row.iter() {
+            if username.is_empty() {
+                continue;
+            }
+            let count = user_counts.entry(username).or_insert(0);
             *count += 1;
         }
     }
@@ -103,7 +114,7 @@ fn main() {
         let mut best = 0;
         let mut best_user = "";
         for (user, user_count) in user_counts.iter() {
-            if *USERS.get(user).unwrap() == faction && *user_count > best {
+            if *USERS.get(*user).unwrap() == faction && *user_count > best {
                 best = *user_count;
                 best_user = user;
             }
@@ -114,4 +125,12 @@ fn main() {
     println!("\nNumber of pixels placed:");
     let total = user_counts.values().sum::<i32>();
     println!("{}", total);
+
+    println!("\nLeaderboard:");
+    let mut leaderboard = user_counts.into_iter().collect::<Vec<_>>();
+    leaderboard.sort_by(|a, b| b.1.cmp(&a.1));
+    for (user, count) in leaderboard.iter().take(10) {
+        let faction = USERS.get(*user).unwrap();
+        println!("{}: {} ({})", user, count, faction);
+    }
 }
