@@ -127,7 +127,7 @@ fn main() {
     println!("{}", total);
 
     println!("\nLeaderboard:");
-    let mut leaderboard = user_counts.into_iter().collect::<Vec<_>>();
+    let mut leaderboard = user_counts.clone().into_iter().collect::<Vec<_>>();
     leaderboard.sort_by(|a, b| b.1.cmp(&a.1));
     for (user, count) in leaderboard.iter().take(10) {
         let faction = USERS.get(*user).unwrap();
@@ -138,4 +138,11 @@ fn main() {
     let min = total * 30;
     let max = total * 50;
     println!("Estimated between {} and {} hours", min/3600, max/3600);
+
+    println!("\nParticipation rates:");
+    for faction in ["MECA", "MRIE", "CFI", "EP", "GM", "ITI", "LH"] {
+        let count = USERS.iter().filter(|(_, f)| **f == faction).count();
+        let participating = user_counts.iter().filter(|(&&u, &c)| c >= 10 && *USERS.get(u).unwrap() == faction).count();
+        println!("{}: {:.02}%", faction, participating as f64 / count as f64 * 100.0);
+    }
 }
