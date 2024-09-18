@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::thread::sleep;
 use std::time::Duration;
 use std::collections::{HashMap, HashSet};
@@ -8,7 +9,7 @@ use urlencoding::encode;
 
 #[path ="../users.rs"]
 mod users;
-use users::USERS;
+use users::{FACTIONS, USERS};
 
 fn main() {
     let data = std::fs::read_to_string("../Pxls/extras/pixels.log").expect("Failed to read pixels.log");
@@ -185,4 +186,15 @@ fn main() {
     for (user, rate) in conflict_rates.iter().rev().take(10) {
         println!("{}: {:.02}%", user, rate);
     }
+
+    println!("\nCommand for timelapse:");
+    let mut users = Vec::new();
+    let mut colors = Vec::new();
+    for &&username in user_counts.keys() {
+        let faction = USERS.get(username).unwrap();
+        let color = FACTIONS.iter().find(|(f, _)| f == faction).map(|(_, c)| c).unwrap_or(&0);
+        users.push(username);
+        colors.push(format!("{color:06x}"));
+    }
+    println!("pipenv run python logs/timelapse.py pixels.log --config-path pxls.conf --output-path pixels.gif --every 35 --scale 2 --user-filter {} --user-color-codes {}", users.join(" "), colors.join(" "));
 }

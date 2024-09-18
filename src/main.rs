@@ -7,17 +7,7 @@ use serde_json::Value;
 use urlencoding::encode;
 
 mod users;
-use users::USERS;
-
-const EXPECTED_FACTIONS: &[(&str, usize)] = &[
-    ("MECA", 0xffea00),
-    ("MRIE", 0x59ff21),
-    ("CFI", 0xff2200),
-    ("EP", 0xff8ac0),
-    ("GM", 0x0600bd),
-    ("ITI", 0x00fffb),
-    ("LH", 0xff7700)
-];
+use users::{USERS, FACTIONS};
 
 fn list_users() -> anyhow::Result<Vec<String>> {
     // Send request
@@ -294,7 +284,7 @@ fn prepare(token: &'static str) -> anyhow::Result<()> {
     let existing_factions = get_factions(token)?;
     println!("Factions: {existing_factions:?}");
 
-    for (faction, color) in EXPECTED_FACTIONS {
+    for (faction, color) in FACTIONS {
         if !existing_factions.contains_key(*faction) {
             println!("Creating faction {faction}");
             create_faction(token, faction, *color)?;
