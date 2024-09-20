@@ -7,6 +7,8 @@ It was made for [the 2024 temporary place event at INSA Rouen](https://pixelwar.
 ## Features
 
 - Ban users not in whitelist
+- Endorse a username policy
+- Create and configurate desired factions
 - Automatically assign factions to users
 - Detect unintented states
 - Compute statistics from pixels.log
