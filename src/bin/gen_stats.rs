@@ -197,4 +197,10 @@ fn main() {
         colors.push(format!("{color:06x}"));
     }
     println!("pipenv run python logs/timelapse.py pixels.log --config-path pxls.conf --output-path pixels.gif --every 35 --scale 2 --user-filter {} --user-color-codes {}", users.join(" "), colors.join(" "));
+
+    for faction in ["MECA", "MRIE", "CFI", "EP", "GM", "ITI", "LH"] {
+        let participating_users = USERS.iter().filter(|(_, f)| **f == faction).map(|(u, _)| *u).collect::<Vec<_>>();
+        println!("\n{faction}:");
+        println!("pipenv run python convert/logs2img.py pixels.log pxls.conf board-{faction}.png --user-filter {} --scale=4", participating_users.join(" "));
+    }
 }
